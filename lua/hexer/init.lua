@@ -55,10 +55,11 @@ M.exec = function(input)
   local trimmed = ""
   local formatted = {}
 
-  -- If the input length modulo 64 equals 10, split the input 
-  -- into a formatted and a trimmed part. For example a function 
-  -- selector 0xc6eb23d0 (10 bytes) followed by data thats in 
-  -- multiples of 64 bytes
+  -- If the input length modulo 64 (chars) is 10, split the input into a formatted 
+  -- and a trimmed part. For example a function selector 0xc6eb23d0 followed by 
+  -- multiples of 64 char data, implies a selector followed by data:
+  -- [0x + 8]        + data 
+  --   1 + 5 bytes   + word multiples of 32 bytes, or 64 chars.
   --
   if #input % 64 == 10 then
     trimmed, formatted = input:sub(11), {input:sub(1, 10)}
