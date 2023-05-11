@@ -41,7 +41,8 @@ local function format_bytes(input)
 
     if trim(hex) ~= "" then
       -- Add offset
-      local comment = string.format(" // 0x%02x", offsetCounter * 32)
+      local currentOffset = offsetCounter * 32
+      local comment = string.format(" // 0x%03x (%03d)", currentOffset, currentOffset)
       offsetCounter = offsetCounter + 1
       table.insert(formatted, group(hex) .. comment)
     end
