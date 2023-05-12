@@ -1,15 +1,17 @@
+# This is experimental! A work in progress.
+
 ## What
 
-When working with solidity, json-rpc or Remix, you get large data that is hard to grok. For example, examining calldata for a transaction is difficult with a large string. This plugin splits the selector and data portion, so you can get even more frustrated.
+When working with solidity, json-rpc or Remix, a long string is hard to grok. For example, transaction calldata is encoded and it is easier to format it before investigating . This plugin splits the selector and data portion, so you can start decoding.
 
 For example, given the following calldata:
 ```
 ["0xc6f922d00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"]
 ```
 
-Hexer can format it like this, putting the formatted output above the source (current word/line)
+Hexer breaks the calldata into a selector and data , placing the formatted output above the source (current word/line). Each line of data represents 32 bytes of data split into 4 byte chunks. There's also an offset indicator to help with navigation.
 ```
-0xc6f922d0
+0xc6f922d0 <-- selector
 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000007 // 0x00
 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000060 // 0x20
 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000009 // 0x40
@@ -20,7 +22,8 @@ Hexer can format it like this, putting the formatted output above the source (cu
 ["0xc6f922d00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"]
 ```
 
-Demo
+## Asciinema Demo
+
 [![asciicast](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn.png)](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn)
 
 
@@ -38,7 +41,8 @@ Demo
 
 ```
 
-## key binding using nvChad
+## Key binding using nvChad
+
 ```lua
 M.hexer = {
   n = {
