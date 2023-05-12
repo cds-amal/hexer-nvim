@@ -21,7 +21,8 @@ Hexer can format it like this, putting the formatted output above the source (cu
 ```
 
 Demo
-<script src="https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn.png" id="Ee0K1WSutTCpn4nL68zXAYsgng" async data-autoplay="true" data-size="big"></script>
+[![asciicast](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn.png)](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn)
+
 
 ## Config
 
