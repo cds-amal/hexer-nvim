@@ -13,7 +13,7 @@ end
 
 -- Function to group characters in a string
 local function group(str, size)
-  size = size or 8
+  size = size or 16
   local grouped = ""
   for i = 0, 56, size do
     grouped = grouped .. str:sub(i + 1, i + size) .. " "
