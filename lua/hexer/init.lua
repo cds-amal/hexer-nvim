@@ -56,18 +56,33 @@ M.exec = function(input)
   local trimmed = ""
   local formatted = {}
 
-  -- If the input length modulo 64 (chars) is 10, split the input into a formatted 
-  -- and a trimmed part. For example a function selector 0xc6eb23d0 followed by 
+  -- If the input length modulo 64 (chars) is 10, split the input into a formatted
+  -- and a trimmed part. For example a function selector 0xc6eb23d0 followed by
   -- multiples of 64 char data, implies a selector followed by data:
-  -- [0x + 8]        + data 
+  -- [0x + 8]        + data
   --   1 + 5 bytes   + word multiples of 32 bytes, or 64 chars.
   --
   if #input % 64 == 10 then
-    trimmed, formatted = input:sub(11), {input:sub(1, 10)}
+    trimmed, formatted = input:sub(11), { input:sub(1, 10) }
     insert_above(formatted)
   end
 
   format_bytes(trimmed)
 end
+
+M.convert_bytes_to_ascii = function(input_bytes)
+  local res = ""
+  local i = 1
+  while i <= string.len(input_bytes) do
+    while string.sub(input_bytes, i, i) == " " do
+      i = i + 1
+    end
+    res = res .. string.char(tonumber(string.sub(input_bytes, i, i + 1), 16))
+    i = i + 2
+  end
+  print(res)
+  insert_above({ res })
+end
+
 
 return M

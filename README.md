@@ -20,6 +20,9 @@ Hexer can format it like this, putting the formatted output above the source (cu
 ["0xc6f922d00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"]
 ```
 
+Demo
+[![asciicast](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn.png)](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn)
+
 
 ## Config
 
@@ -37,7 +40,7 @@ Hexer can format it like this, putting the formatted output above the source (cu
 
 ## key binding using nvChad
 ```lua
-{
+M.hexer = {
   n = {
     ["<leader>mm"] = {
       function()
@@ -45,6 +48,13 @@ Hexer can format it like this, putting the formatted output above the source (cu
       end,
       "Expand calldata",
     },
-  },
+
+    ["<leader>mb"] = {
+      function()
+        require('hexer').convert_bytes_to_ascii(vim.fn.expand("<cword>"))
+      end,
+      "Convert bytes to ascii",
+    },
+  }
 }
 ```
