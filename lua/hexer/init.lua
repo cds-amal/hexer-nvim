@@ -7,7 +7,7 @@ local function is_pow2(n)
   if n > 64 or n < 2 then
     return false
   end
-  -- Check if the number is a power of 2 by checking if its binary representation has exactly one '1'
+  -- check if the number is a power of 2 by checking if its binary representation has exactly one '1'
   -- and by confirming that it is less than or equal to 64
     return n > 0 and ((n & (n - 1)) == 0)
 end
@@ -20,7 +20,7 @@ M.format_calldata = function(group_size)
   -- if not is_pow2(group_size) then
   --   group_size = 64
   -- end
-  api.format_calldata(vim.fn.expand("<cword>"), group_size)
+  api.format_data(vim.fn.expand("<cword>"), group_size)
 end
 
 M.bytes_to_ascii = function()

@@ -50,23 +50,25 @@ local function format_bytes(input, group_size)
   insert_above(formatted)
 end
 
--- Function to format_calldata the formatting
-M.format_calldata = function(input, group_size)
-  local trimmed = ""
-  local formatted = {}
 
-  -- If the input length modulo 64 (chars) is 10, split the input into a formatted
-  -- and a trimmed part. For example a function selector 0xc6eb23d0 followed by
-  -- multiples of 64 char data, implies a selector followed by data:
-  -- [0x + 8]        + data
-  --   1 + 5 bytes   + word multiples of 32 bytes, or 64 chars.
-  --
-  if #input % 64 == 10 then
-    trimmed, formatted = input:sub(11), { "Selector: " .. input:sub(1, 10) }
-    insert_above(formatted)
+-- Format calldata or returndata
+M.format_data = function(input, group_size)
+  if input:find("0x", 1, true) == 1 then
+    input = input:sub(3)
   end
 
-  format_bytes(trimmed, group_size)
+  -- If the input length modulo 64 (chars) is 8, split the input into a formatted
+  -- and a trimmed part. For example a function selector 0xc6eb23d0 followed by
+  -- multiples of 64 char data, implies a selector followed by data.
+  --
+  if #input % 64 == 8 then
+    insert_above({"Selector: 0x" .. input:sub(1, 8)})  -- selector
+    input = input:sub(9)
+  else
+    insert_above({ "Calldata:"})
+  end
+
+  format_bytes(input, group_size)
 end
 
 M.convert_bytes_to_ascii = function(input_bytes)
