@@ -34,13 +34,32 @@ function M.check()
   end
   
   -- Check commands
-  local commands = {"HexerFormat", "HexerBytesToAscii"}
+  local commands = {"HexerFormat", "HexerBytesToAscii", "HexerDecode"}
   for _, cmd in ipairs(commands) do
     if vim.fn.exists(":" .. cmd) == 2 then
       vim.health.ok(string.format("Command :%s is available", cmd))
     else
       vim.health.error(string.format("Command :%s is not available", cmd))
     end
+  end
+  
+  -- Check for Foundry installation
+  vim.health.start("Optional dependencies")
+  local cast_check = vim.fn.system("which cast")
+  if vim.v.shell_error == 0 then
+    vim.health.ok("Foundry's cast command is available (required for :HexerDecode)")
+    
+    -- Check cast version
+    local version_output = vim.fn.system("cast --version")
+    if vim.v.shell_error == 0 then
+      local version = version_output:match("cast (%S+)")
+      if version then
+        vim.health.info("Cast version: " .. version)
+      end
+    end
+  else
+    vim.health.warn("Foundry's cast command not found. Install from https://getfoundry.sh/")
+    vim.health.info("The :HexerDecode command requires Foundry to be installed")
   end
   
   -- Test basic functionality
@@ -63,15 +82,21 @@ function M.check()
     vim.health.error("Failed to load API module: " .. tostring(api))
   end
   
-  -- Suggest keybindings if not set
-  vim.health.start("Suggested keybindings")
+  -- Check default keymaps
+  vim.health.start("Keybindings")
+  if vim.g.hexer_no_mappings then
+    vim.health.info("Default keymaps are disabled (g:hexer_no_mappings is set)")
+  else
+    vim.health.ok("Default keymap <leader>ha is enabled for ABI decode")
+  end
+  
   vim.health.info([[
-Add these to your config:
+Suggested additional keymaps:
 ```lua
 vim.keymap.set('n', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
 vim.keymap.set('v', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
-vim.keymap.set('n', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
-vim.keymap.set('v', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
+vim.keymap.set('n', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
+vim.keymap.set('v', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
 ```
   ]])
 end

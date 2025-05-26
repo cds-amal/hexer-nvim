@@ -4,7 +4,10 @@
 
 When working with solidity, json-rpc or Remix, a long string is hard to grok. For example, transaction calldata is encoded and it is easier to format it before investigating . This plugin splits the selector and data portion, so you can start decoding.
 
-For example, given the following calldata:
+## Features
+
+### Format Calldata
+Given the following calldata:
 ```
 ["0xc6f922d00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"]
 ```
@@ -22,10 +25,34 @@ Selector: 0xc6f922d0
 ["0xc6f922d00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"]
 ```
 
+### ABI Decode (NEW!)
+With Foundry installed, you can decode calldata to see the function signature and arguments:
+
+```
+0x952899ee0000000000000000000000007abf46564cfd4d67e36dc8fb5def6a1162ebaf6b...
+```
+
+Running `:HexerDecode` will show:
+```
+ABI Decoded Calldata:
+--------------------------------------------------
+Function: modifyAllocations(address,((address,uint32),address[],uint64[])[])
+
+Arguments:
+  0x7aBF46564cfd4d67E36DC8fB5DeF6a1162EBaF6b
+  [((0xcc3Bc3f5397e2b3c5D9869CD17566Ce88E47DceC, 0), [0x8b29d91e67b013e855EaFe0ad704aC4Ab086a574, 0x424246eF71b01ee33aA33aC590fd9a0855F5eFbc], [1, 1])]
+--------------------------------------------------
+```
+
 ## Asciinema Demo
 
 [![asciicast](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn.png)](https://asciinema.org/a/Ee0K1WSutTCpn4nL68zXAYsgn)
 
+
+## Requirements
+
+- Neovim >= 0.8.0
+- [Foundry](https://getfoundry.sh/) (optional, required for `:HexerDecode` command)
 
 ## Config
 
@@ -48,17 +75,28 @@ Selector: 0xc6f922d0
 
 - `:HexerFormat [input]` - Format hex calldata (works with visual selection)
 - `:HexerBytesToAscii [input]` - Convert hex bytes to ASCII
+- `:HexerDecode [input]` - Decode ABI calldata using Foundry (requires `cast` command)
 
 ### Key bindings
 
+#### Default Keymaps
+The plugin provides a default keymap:
+- `<leader>ha` - [H]exer [A]bi decode (works in normal and visual mode)
+
+To disable default keymaps, add this to your config before loading the plugin:
+```vim
+let g:hexer_no_mappings = 1
+```
+
+#### Suggested Additional Keymaps
 ```lua
--- Normal mode
+-- Format and convert commands
 vim.keymap.set('n', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
-vim.keymap.set('n', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
+vim.keymap.set('n', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
 
 -- Visual mode support
 vim.keymap.set('v', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format selected hex' })
-vim.keymap.set('v', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert selected hex to ASCII' })
+vim.keymap.set('v', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert selected hex to ASCII' })
 ```
 
 ### Configuration

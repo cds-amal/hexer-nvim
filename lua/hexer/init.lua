@@ -76,4 +76,20 @@ function M.bytes_to_ascii(input)
   end
 end
 
+-- ABI decode calldata using Foundry
+function M.abi_decode(input)
+  local ok, err = pcall(function()
+    input = get_input(input)
+    if not input or input == "" then
+      error("No input provided. Place cursor on hex calldata or select text.")
+    end
+    
+    api.abi_decode(input, config.get())
+  end)
+  
+  if not ok then
+    vim.notify("Hexer: " .. err, vim.log.levels.ERROR)
+  end
+end
+
 return M

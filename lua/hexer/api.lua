@@ -221,4 +221,73 @@ M.convert_bytes_to_ascii = function(input_bytes, config)
   vim.notify("ASCII: " .. full_ascii, vim.log.levels.INFO)
 end
 
+-- ABI decode using Foundry's cast command
+M.abi_decode = function(input_calldata, config)
+  -- Validate hex input
+  input_calldata = validate_hex(input_calldata)
+  
+  -- Ensure calldata starts with 0x
+  if not input_calldata:match("^0x") then
+    input_calldata = "0x" .. input_calldata
+  end
+  
+  -- Check if cast is available
+  local cast_check = vim.fn.system("which cast")
+  if vim.v.shell_error ~= 0 then
+    error("Foundry's 'cast' command not found. Please install Foundry: https://getfoundry.sh/")
+  end
+  
+  -- Run cast 4byte-decode
+  local cmd = string.format("cast 4byte-decode %s", vim.fn.shellescape(input_calldata))
+  local output = vim.fn.system(cmd)
+  
+  if vim.v.shell_error ~= 0 then
+    error("Failed to decode calldata: " .. output)
+  end
+  
+  -- Parse the output
+  local lines = vim.split(output, "\n", { plain = true, trimempty = true })
+  if #lines == 0 then
+    error("No output from cast 4byte-decode")
+  end
+  
+  -- Format the output
+  local result = {
+    "ABI Decoded Calldata:",
+    string.rep("-", 50),
+  }
+  
+  -- First line should be the function signature
+  if lines[1] then
+    table.insert(result, "Function: " .. lines[1])
+    table.insert(result, "")
+    table.insert(result, "Arguments:")
+  end
+  
+  -- Remaining lines are the decoded arguments
+  for i = 2, #lines do
+    if lines[i] and lines[i] ~= "" then
+      table.insert(result, "  " .. lines[i])
+    end
+  end
+  
+  -- Add separator
+  table.insert(result, string.rep("-", 50))
+  
+  -- Output based on method
+  if config.output_method == "insert" then
+    insert_above(result, config)
+  elseif config.output_method == "float" then
+    -- TODO: Implement floating window
+    insert_above(result, config)
+  else
+    insert_above(result, config)
+  end
+  
+  -- Also show a notification with the function signature
+  if lines[1] then
+    vim.notify("Decoded: " .. lines[1], vim.log.levels.INFO)
+  end
+end
+
 return M

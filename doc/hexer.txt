@@ -57,6 +57,20 @@ Default setup: >lua
     Convert hex bytes to ASCII representation. Non-printable characters are
     shown as dots.
 
+                                                                 *:HexerDecode*
+:HexerDecode [input]
+    Decode ABI calldata using Foundry's cast 4byte-decode command. Shows the
+    function signature and decoded arguments. Requires Foundry to be installed.
+
+DEFAULT KEYMAPS                                              *hexer-keymaps*
+
+The plugin provides the following default keymap:
+    <leader>ha    Decode ABI calldata (normal and visual mode)
+
+To disable default keymaps, set before loading the plugin: >vim
+    let g:hexer_no_mappings = 1
+<
+
 ==============================================================================
 4. CONFIGURATION                                         *hexer-configuration*
 
@@ -110,12 +124,24 @@ hexer.bytes_to_ascii([input])
     Parameters:
       - input: Hex string to convert (optional, defaults to cursor word)
 
+                                                           *hexer.abi_decode()*
+hexer.abi_decode([input])
+    Decode ABI calldata using Foundry's cast command.
+    
+    Parameters:
+      - input: Hex calldata to decode (optional, defaults to cursor word)
+    
+    Note: Requires Foundry to be installed (https://getfoundry.sh/)
+
 Example: >lua
     -- Format with custom group size
     require("hexer").format_calldata(nil, { group_size = 8 })
     
     -- Convert specific hex string
     require("hexer").bytes_to_ascii("0x48656c6c6f")
+    
+    -- Decode ABI calldata
+    require("hexer").abi_decode("0x952899ee...")
 <
 
 ==============================================================================
