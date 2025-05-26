@@ -35,6 +35,10 @@ function M.setup(opts)
 end
 
 function M.get()
+  -- Return defaults if setup hasn't been called yet
+  if vim.tbl_isempty(M.options) then
+    return M.defaults
+  end
   return M.options
 end
 

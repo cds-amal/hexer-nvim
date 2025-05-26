@@ -51,6 +51,10 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
   - Improved ASCII conversion with hex dump format
   - Tree-structured output for decoded calldata
 
+### Removed
+- Backward compatibility commands (HexerFormatCalldata, HexerConvertBytesToAscii)
+- Migration notes as backward compatibility is not required
+
 ### Fixed
 - **Code Quality**
   - Removed commented-out code
@@ -62,6 +66,12 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
   - Resolved conflict where `<leader>ha` was suggested for both ASCII conversion and ABI decode
   - Implemented consistent mnemonic scheme: [H]exer [D]ecode, [H]exer [F]ormat, [H]exer [A]scii
   - All default keymaps now properly documented and conflict-free
+
+- **Runtime Errors**
+  - Fixed "attempt to perform arithmetic on local 'group_size' (a nil value)" error
+  - Fixed config module returning empty options when setup() not called
+  - Added proper nil checking for optional parameters
+  - Plugin now works without requiring setup() to be called first
 
 ### Technical Improvements
 - Modular code organization with separation of concerns

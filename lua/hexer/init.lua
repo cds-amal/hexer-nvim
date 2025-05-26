@@ -46,7 +46,7 @@ function M.format_calldata(input, opts)
     end
     
     -- Validate and use group size
-    local group_size = opts.group_size or cfg.group_size
+    local group_size = (opts and opts.group_size) or cfg.group_size or 64
     if group_size % 2 ~= 0 or group_size < 2 or group_size > 64 then
       error("Group size must be an even number between 2 and 64")
     end
