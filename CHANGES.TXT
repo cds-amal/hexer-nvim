@@ -24,7 +24,9 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
 - **ABI Decode Feature** (NEW!)
   - Added `:HexerDecode` command using Foundry's `cast 4byte-decode`
   - Complex nested structure parser with tree visualization
-  - Custom Solidity signature parser for canonical function signatures
+  - Dual parser implementation:
+    - LPeg-based parser for accurate grammar-based parsing (preferred)
+    - Manual parser as fallback when LPeg is not available
   - Understands Solidity types: address, uint256, bytes, tuples, arrays
   - Intelligent detection of common patterns (operatorSet, strategies, magnitudes)
   - Automatic parameter name generation based on type and context
@@ -80,9 +82,11 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
 - Idiomatic Neovim plugin patterns
 - Forward compatibility with planned features (floating windows, virtual text)
 - Efficient string operations and table manipulation
-- Custom Solidity signature parser for accurate type extraction
+- LPeg-based Solidity signature parser for robust grammar parsing
+- Graceful fallback chain: LPeg → manual parser → regex
 - Context-aware parameter naming based on Solidity patterns
 
 ### Dependencies
 - Neovim >= 0.8.0 (required)
 - Foundry (optional, required for `:HexerDecode` command)
+- LPeg (optional, provides better parsing for `:HexerDecode`)

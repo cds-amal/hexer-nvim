@@ -252,9 +252,25 @@ end
 
 -- Extract parameter names from function signature
 function ComplexParser:extract_param_names(function_sig)
-  -- Use Solidity signature parser
-  local ok, sol_parser = pcall(require, "hexer.solidity_parser")
-  if ok then
+  -- Try LPeg parser first (if available)
+  local ok_lpeg, lpeg_parser = pcall(require, "hexer.solidity_parser_lpeg")
+  if ok_lpeg then
+    local parsed = lpeg_parser.parse_signature(function_sig)
+    if parsed then
+      self.function_info = parsed
+      self.parameter_names = lpeg_parser.generate_parameter_names(parsed.parameters)
+      -- Store additional type info for better formatting
+      self.parameter_types = {}
+      for i, param in ipairs(parsed.parameters) do
+        self.parameter_types[i] = lpeg_parser.get_type_info(param)
+      end
+      return
+    end
+  end
+  
+  -- Fallback to manual parser
+  local ok_manual, sol_parser = pcall(require, "hexer.solidity_parser")
+  if ok_manual then
     local func_info = sol_parser.parse_signature(function_sig)
     if func_info then
       self.function_info = func_info
@@ -263,7 +279,7 @@ function ComplexParser:extract_param_names(function_sig)
     end
   end
   
-  -- Fallback to simple regex-based parsing
+  -- Final fallback to simple regex-based parsing
   local params = function_sig:match("%((.+)%)$")
   if not params then return end
   
