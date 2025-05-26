@@ -37,30 +37,51 @@ Selector: 0xc6f922d0
   name = "hexer",
   lazy = false,
   config = function()
+    require("hexer").setup({
+      -- your configuration (optional)
+    })
   end
 }
-
 ```
+
+### Commands
+
+- `:HexerFormat [input]` - Format hex calldata (works with visual selection)
+- `:HexerBytesToAscii [input]` - Convert hex bytes to ASCII
 
 ### Key bindings
 
-- [nvChad](https://nvchad.com/)
-  ```lua
-  M.hexer = {
-    n = {
-      ["<leader>mm"] = {
-        function()
-          require("hexer").format_calldata()
-        end,
-        "Expand calldata",
-      },
+```lua
+-- Normal mode
+vim.keymap.set('n', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
+vim.keymap.set('n', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
+
+-- Visual mode support
+vim.keymap.set('v', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format selected hex' })
+vim.keymap.set('v', '<leader>ha', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert selected hex to ASCII' })
+```
+
+### Configuration
+
+```lua
+require("hexer").setup({
+  -- Display options
+  group_size = 64,        -- Characters per line (32 bytes = 64 hex chars)
+  show_offset = true,     -- Show offset comments
+  offset_format = "both", -- "hex", "decimal", or "both"
   
-      ["<leader>mb"] = {
-        function()
-          require("hexer").bytes_to_ascii()
-        end,
-        "Convert bytes to ascii",
-      },
-    },
-  }
-  ```
+  -- Formatting options  
+  show_selector = true,   -- Show selector line for calldata
+  uppercase = false,      -- Use uppercase hex letters
+  
+  -- Highlight groups
+  highlights = {
+    selector = "Title",
+    offset = "Comment",
+  },
+})
+```
+
+### Health Check
+
+Run `:checkhealth hexer` to verify your installation.
