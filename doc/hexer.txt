@@ -63,6 +63,20 @@ Default setup: >lua
     function signature and decoded arguments with a tree-structured view for
     complex nested data. Automatically detects common patterns like operator
     sets, strategies, and allocation parameters. Requires Foundry to be installed.
+    
+    Function signatures and ABIs are cached persistently for better performance.
+
+                                                             *:HexerCacheStats*
+:HexerCacheStats
+    Display cache statistics including number of cached signatures and ABIs.
+
+                                                             *:HexerCacheClear*
+:HexerCacheClear
+    Clear all cached signatures and ABIs.
+
+                                                              *:HexerCacheSave*
+:HexerCacheSave
+    Manually save cache to disk (normally done automatically).
 
 DEFAULT KEYMAPS                                              *hexer-keymaps*
 

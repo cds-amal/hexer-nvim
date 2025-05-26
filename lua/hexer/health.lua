@@ -57,9 +57,33 @@ function M.check()
         vim.health.info("Cast version: " .. version)
       end
     end
+    
+    -- Check forge
+    local forge_check = vim.fn.system("which forge")
+    if vim.v.shell_error == 0 then
+      vim.health.ok("Forge is available (enables ABI lookup)")
+    else
+      vim.health.info("Forge not found. ABI lookup will be limited")
+    end
   else
     vim.health.warn("Foundry's cast command not found. Install from https://getfoundry.sh/")
     vim.health.info("The :HexerDecode command requires Foundry to be installed")
+  end
+  
+  -- Check for jq
+  local jq_check = vim.fn.system("which jq")
+  if vim.v.shell_error == 0 then
+    vim.health.ok("jq is available (improves ABI parsing)")
+  else
+    vim.health.info("jq not found. Some ABI features may be limited")
+  end
+  
+  -- Check for ripgrep
+  local rg_check = vim.fn.system("which rg")
+  if vim.v.shell_error == 0 then
+    vim.health.ok("ripgrep is available (improves contract search)")
+  else
+    vim.health.info("ripgrep not found. Contract search may be slower")
   end
   
   -- Test basic functionality

@@ -27,6 +27,11 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
   - Dual parser implementation:
     - LPeg-based parser for accurate grammar-based parsing (preferred)
     - Manual parser as fallback when LPeg is not available
+  - ABI-aware formatting:
+    - Automatic ABI lookup using `forge inspect`
+    - Searches for contracts containing the function
+    - Uses proper field names from contract ABI (e.g., "newMagnitudes" instead of "magnitudes")
+    - Shows internal types (e.g., "struct OperatorSet", "struct AllocateParams[]")
   - Understands Solidity types: address, uint256, bytes, tuples, arrays
   - Intelligent detection of common patterns (operatorSet, strategies, magnitudes)
   - Automatic parameter name generation based on type and context
@@ -76,6 +81,18 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
   - Fixed config module returning empty options when setup() not called
   - Added proper nil checking for optional parameters
   - Plugin now works without requiring setup() to be called first
+  - Fixed "attempt to index local 'function_sig' (a nil value)" in ABI formatter
+  - Added input validation to prevent nil reference errors
+  - Fixed "attempt to call field 'format_struct' (a nil value)" error
+  - Added safe module loading with pcall to handle missing dependencies gracefully
+
+- **Display Issues**
+  - Fixed double colon display bug in ABI decode output (e.g., "Operator::" → "Operator:")
+  - Centralized name formatting logic to prevent duplicate colons
+  - Improved spacing and alignment in tree-structured output
+  - Restored proper tree structure for complex nested data
+  - Added specialized formatter for AllocationParams structures
+  - Fixed parameter display to show tree branches (└─) for better visualization
 
 ### Technical Improvements
 - Modular code organization with separation of concerns
@@ -85,8 +102,13 @@ CHANGES.TXT - hexer-nvim Plugin Changelog
 - LPeg-based Solidity signature parser for robust grammar parsing
 - Graceful fallback chain: LPeg → manual parser → regex
 - Context-aware parameter naming based on Solidity patterns
+- Specialized tree formatter for complex data structures
 
 ### Dependencies
 - Neovim >= 0.8.0 (required)
 - Foundry (optional, required for `:HexerDecode` command)
 - LPeg (optional, provides better parsing for `:HexerDecode`)
+- Additional tools for enhanced functionality:
+  - `forge` - Enables ABI lookup for accurate field names
+  - `jq` - Improves JSON parsing for ABI data
+  - `ripgrep` - Speeds up contract file searches

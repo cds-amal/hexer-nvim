@@ -37,9 +37,7 @@ end
 local function insert_above(lines, config)
   local cur_line = vim.api.nvim_win_get_cursor(0)[1]
   
-  -- Create undo group
-  vim.cmd("undojoin")
-  
+  -- Create a new undo point instead of trying to join
   vim.api.nvim_buf_set_lines(0, cur_line - 1, cur_line - 1, false, lines)
   
   -- Apply highlights if configured
@@ -323,6 +321,13 @@ function ComplexParser:split_by_delimiter(str, delimiter, respect_depth)
   return parts
 end
 
+-- Helper to format name with colon (avoiding double colons)
+local function format_name_with_colon(name)
+  if not name then return "" end
+  if name:match(":$") then return name end
+  return name .. ":"
+end
+
 -- Parse a single value with context
 function ComplexParser:parse_value(value, indent, name)
   local lines = {}
@@ -331,26 +336,27 @@ function ComplexParser:parse_value(value, indent, name)
   -- Handle different value types
   if value:match("^0x[0-9a-fA-F]+$") then
     -- Ethereum address
-    local display_name = name and (name .. ":") or ""
-    local padding = 50 - #indent - #display_name - #value
-    lines[1] = string.format("%s%s%s%s%s", 
-      indent, 
-      display_name and (display_name .. " ") or "",
-      value,
-      string.rep(" ", math.max(1, padding)),
-      offset_str
-    )
+    local display_name = format_name_with_colon(name)
+    if display_name ~= "" then
+      -- Show name on separate line with tree structure
+      lines[1] = display_name
+      lines[2] = indent .. "  └─ " .. value:lower() .. string.rep(" ", math.max(1, 50 - #indent - #value - 5)) .. offset_str
+    else
+      -- No name, just show address
+      lines[1] = indent .. value:lower() .. string.rep(" ", math.max(1, 50 - #indent - #value)) .. offset_str
+    end
     self:advance_offset()
     
   elseif value:match("^%d+$") then
     -- Number
-    local display_name = name and (name .. ":") or ""
+    local display_name = format_name_with_colon(name)
     lines[1] = string.format("%s%s %s", indent, display_name, value)
     self:advance_offset()
     
   elseif value:match("^%[%[.+%]%]$") then
     -- Array of arrays
-    lines[1] = indent .. (name and (name .. ":") or "Arrays:") .. string.rep(" ", 50 - #indent - #name - 7) .. offset_str
+    local display_name = name and format_name_with_colon(name) or "Arrays:"
+    lines[1] = indent .. display_name .. string.rep(" ", 50 - #indent - #display_name) .. offset_str
     local inner = value:sub(2, -2)
     local arrays = self:split_by_delimiter(inner, "]", false)
     
@@ -372,7 +378,8 @@ function ComplexParser:parse_value(value, indent, name)
     
     if #items > 0 and items[1]:match("^0x") then
       -- Array of addresses
-      lines[1] = indent .. (name and (name .. ":") or "addresses:") .. string.rep(" ", 50 - #indent - #(name or "addresses") - 1) .. offset_str
+      local display_name = name and format_name_with_colon(name) or "addresses:"
+      lines[1] = indent .. display_name .. string.rep(" ", 50 - #indent - #display_name) .. offset_str
       for i, item in ipairs(items) do
         local prefix = i < #items and tree_chars.mid or tree_chars.last
         local sub_indent = indent .. tree_chars.vert .. " "
@@ -384,7 +391,8 @@ function ComplexParser:parse_value(value, indent, name)
       end
     else
       -- Array of numbers or other values
-      lines[1] = indent .. (name and (name .. ":") or "values:") .. string.rep(" ", 50 - #indent - #(name or "values") - 1) .. offset_str
+      local display_name = name and format_name_with_colon(name) or "values:"
+      lines[1] = indent .. display_name .. string.rep(" ", 50 - #indent - #display_name) .. offset_str
       for i, item in ipairs(items) do
         local prefix = i < #items and tree_chars.mid or tree_chars.last
         table.insert(lines, string.format("%s%s [%d] %s", indent, prefix, i-1, item))
@@ -406,7 +414,8 @@ function ComplexParser:parse_value(value, indent, name)
       self:advance_offset(2)
     else
       -- Generic tuple
-      lines[1] = indent .. (name and (name .. ":") or "tuple:")
+      local display_name = name and format_name_with_colon(name) or "tuple:"
+      lines[1] = indent .. display_name
       for i, part in ipairs(parts) do
         local prefix = i < #parts and tree_chars.mid or tree_chars.last
         local sub_lines = self:parse_value(part, indent .. prefix .. " ")
@@ -418,13 +427,16 @@ function ComplexParser:parse_value(value, indent, name)
     
   elseif value:match("^%[%(") then
     -- Array of tuples (like AllocationParams)
-    -- Determine the name based on context
-    local array_name = name or "AllocationParams"
-    -- For modifyAllocations, the second parameter is typically allocationParams
-    if name == "AllocationParams:" then
-      array_name = "AllocationParams"
+    -- Check if this looks like allocation params structure
+    if name == "AllocationParams" and value:match("^%[%(%(.*%), %[.*%], %[.*%]%)") then
+      -- Use specialized formatter for allocation params
+      local tree_formatter = require("hexer.tree_formatter")
+      return tree_formatter.format_allocation_params(value, indent, self)
     end
-    lines[1] = indent .. array_name .. ":" .. string.rep(" ", 50 - #indent - #array_name - 1) .. offset_str
+    
+    -- Otherwise, show generic array header
+    local display_name = format_name_with_colon(name or "AllocationParams")
+    lines[1] = indent .. display_name .. string.rep(" ", 50 - #indent - #display_name) .. offset_str
     
     -- Parse array of complex tuples
     local inner = value:sub(2, -2)
@@ -556,7 +568,8 @@ function ComplexParser:parse_value(value, indent, name)
     
   else
     -- Unknown format, display as-is
-    lines[1] = indent .. (name and (name .. ": ") or "") .. value
+    local display_name = name and format_name_with_colon(name) or ""
+    lines[1] = indent .. display_name .. (display_name ~= "" and " " or "") .. value
   end
   
   return lines
@@ -588,7 +601,7 @@ local function format_decoded_output(lines, input_calldata)
       local param_name = nil
       if parser.parameter_names and parser.parameter_names[i-1] then
         param_name = parser.parameter_names[i-1]
-        param_name = param_name:sub(1, 1):upper() .. param_name:sub(2) .. ":"
+        param_name = param_name:sub(1, 1):upper() .. param_name:sub(2)
       end
       
       -- Parse the value
@@ -628,12 +641,38 @@ M.abi_decode = function(input_calldata, config)
     error("Foundry's 'cast' command not found. Please install Foundry: https://getfoundry.sh/")
   end
   
-  -- Run cast 4byte-decode
-  local cmd = string.format("cast 4byte-decode %s", vim.fn.shellescape(input_calldata))
-  local output = vim.fn.system(cmd)
+  -- Check cache for function signature
+  local cache = require("hexer.cache")
+  local selector = input_calldata:sub(1, 10) -- 0x + 8 chars
+  local cached_sig = cache.get_signature(selector)
   
-  if vim.v.shell_error ~= 0 then
-    error("Failed to decode calldata: " .. output)
+  local output
+  if cached_sig then
+    -- Use cached signature and decode the rest
+    output = cached_sig .. "\n"
+    -- Run cast abi-decode to get the parameter values
+    local decode_cmd = string.format("cast abi-decode '%s' %s 2>/dev/null", 
+      cached_sig:match("%((.*)%)"), input_calldata:sub(11))
+    local decode_output = vim.fn.system(decode_cmd)
+    if vim.v.shell_error == 0 then
+      output = output .. decode_output
+    end
+  else
+    -- Run cast 4byte-decode
+    local cmd = string.format("cast 4byte-decode %s", vim.fn.shellescape(input_calldata))
+    output = vim.fn.system(cmd)
+    
+    if vim.v.shell_error ~= 0 then
+      error("Failed to decode calldata: " .. output)
+    end
+    
+    -- Cache the signature
+    local sig_line = output:match("^[^\n]+")
+    if sig_line then
+      -- Remove any numbering prefix
+      sig_line = sig_line:gsub('^%d+%)%s*"?', ""):gsub('"$', "")
+      cache.set_signature(selector, sig_line)
+    end
   end
   
   -- Parse the output
@@ -642,13 +681,28 @@ M.abi_decode = function(input_calldata, config)
     error("No output from cast 4byte-decode")
   end
   
-  -- Format with tree structure
-  local result = format_decoded_output(lines, display_calldata)
+  -- Extract function signature from first line
+  local function_sig = lines[1] or ""
+  -- Remove the "1)" prefix if present (cast sometimes numbers multiple matches)
+  function_sig = function_sig:gsub('^%d+%)%s*"?', ""):gsub('"$', "")
   
-  -- Add header and footer
-  table.insert(result, 1, "ABI Decoded Calldata")
-  table.insert(result, 2, string.rep("─", 70))
-  table.insert(result, string.rep("─", 70))
+  -- Try ABI-aware formatting first
+  local abi_formatter = require("hexer.abi_formatter")
+  local abi_result = abi_formatter.format_with_abi(lines, function_sig, display_calldata)
+  
+  local result
+  if abi_result then
+    -- Use ABI-formatted result
+    result = abi_result
+  else
+    -- Fallback to generic formatting
+    result = format_decoded_output(lines, display_calldata)
+    
+    -- Add header and footer
+    table.insert(result, 1, "ABI Decoded Calldata")
+    table.insert(result, 2, string.rep("─", 70))
+    table.insert(result, string.rep("─", 70))
+  end
   
   -- Output based on method
   if config.output_method == "insert" then
