@@ -34,14 +34,25 @@ With Foundry installed, you can decode calldata to see the function signature an
 
 Running `:HexerDecode` will show:
 ```
-ABI Decoded Calldata:
---------------------------------------------------
+ABI Decoded Calldata
+──────────────────────────────────────────────────────────────────────
 Function: modifyAllocations(address,((address,uint32),address[],uint64[])[])
 
-Arguments:
-  0x7aBF46564cfd4d67E36DC8fB5DeF6a1162EBaF6b
-  [((0xcc3Bc3f5397e2b3c5D9869CD17566Ce88E47DceC, 0), [0x8b29d91e67b013e855EaFe0ad704aC4Ab086a574, 0x424246eF71b01ee33aA33aC590fd9a0855F5eFbc], [1, 1])]
---------------------------------------------------
+Calldata: 0x952899ee00...
+
+Operator: 0x7aBF46564cfd4d67E36DC8fB5DeF6a1162EBaF6b    @ 0x000
+
+AllocationParams:                                        @ 0x020
+└─ AllocationParams[0]:
+   ├─ operatorSet.avs: 0xcc3Bc3f5397e2b3c5D9869CD17566Ce88E47DceC
+   ├─ operatorSet.id:  0
+   ├─ strategies:
+   │  ├─ [0] 0x8b29d91e67b013e855EaFe0ad704aC4Ab086a574
+   │  └─ [1] 0x424246eF71b01ee33aA33aC590fd9a0855F5eFbc
+   └─ magnitudes:
+      ├─ [0] 1
+      └─ [1] 1
+──────────────────────────────────────────────────────────────────────
 ```
 
 ## Asciinema Demo
@@ -80,23 +91,16 @@ Arguments:
 ### Key bindings
 
 #### Default Keymaps
-The plugin provides a default keymap:
-- `<leader>ha` - [H]exer [A]bi decode (works in normal and visual mode)
+The plugin provides default keymaps (all start with `<leader>h`):
+- `<leader>hd` - [H]exer [D]ecode - ABI decode calldata
+- `<leader>hf` - [H]exer [F]ormat - Format hex calldata  
+- `<leader>ha` - [H]exer [A]scii - Convert hex to ASCII
+
+All keymaps work in both normal and visual mode.
 
 To disable default keymaps, add this to your config before loading the plugin:
 ```vim
 let g:hexer_no_mappings = 1
-```
-
-#### Suggested Additional Keymaps
-```lua
--- Format and convert commands
-vim.keymap.set('n', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
-vim.keymap.set('n', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
-
--- Visual mode support
-vim.keymap.set('v', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format selected hex' })
-vim.keymap.set('v', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert selected hex to ASCII' })
 ```
 
 ### Configuration

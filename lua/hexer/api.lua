@@ -221,14 +221,326 @@ M.convert_bytes_to_ascii = function(input_bytes, config)
   vim.notify("ASCII: " .. full_ascii, vim.log.levels.INFO)
 end
 
+-- Tree drawing characters
+local tree_chars = {
+  mid = "├─",
+  last = "└─",
+  vert = "│ ",
+  empty = "  "
+}
+
+-- Helper function to calculate offsets for structured output
+local function calculate_offset(position)
+  return string.format("@ 0x%03x", position)
+end
+
+-- Advanced parser for complex data structures
+local ComplexParser = {}
+
+function ComplexParser:new()
+  local obj = {
+    offset = 0,
+    parameter_names = {}
+  }
+  setmetatable(obj, { __index = self })
+  return obj
+end
+
+function ComplexParser:advance_offset(bytes)
+  self.offset = self.offset + (bytes or 32)
+end
+
+-- Extract parameter names from function signature
+function ComplexParser:extract_param_names(function_sig)
+  -- Extract the parameter list from the function signature
+  local params = function_sig:match("%((.+)%)$")
+  if not params then return end
+  
+  -- Simple extraction of parameter names for common patterns
+  if params:match("address%s*,%s*%(%(.+%)%[%]%)%[%]") then
+    -- Pattern like: address, ((address,uint32), address[], uint64[])[]
+    self.parameter_names = {"operator", "allocationParams"}
+  elseif params:match("address%s*,%s*address") then
+    self.parameter_names = {"from", "to"}
+  end
+end
+
+-- Split complex data structures
+function ComplexParser:split_by_delimiter(str, delimiter, respect_depth)
+  local parts = {}
+  local current = ""
+  local depth = 0
+  
+  for i = 1, #str do
+    local char = str:sub(i, i)
+    if char == "(" or char == "[" then
+      depth = depth + 1
+    elseif char == ")" or char == "]" then
+      depth = depth - 1
+    elseif char == delimiter and (not respect_depth or depth == 0) then
+      if current ~= "" then
+        table.insert(parts, current:match("^%s*(.-)%s*$"))
+        current = ""
+      end
+      goto continue
+    end
+    current = current .. char
+    ::continue::
+  end
+  
+  if current ~= "" then
+    table.insert(parts, current:match("^%s*(.-)%s*$"))
+  end
+  
+  return parts
+end
+
+-- Parse a single value with context
+function ComplexParser:parse_value(value, indent, name)
+  local lines = {}
+  local offset_str = calculate_offset(self.offset)
+  
+  -- Handle different value types
+  if value:match("^0x[0-9a-fA-F]+$") then
+    -- Ethereum address
+    local display_name = name and (name .. ":") or ""
+    local padding = 50 - #indent - #display_name - #value
+    lines[1] = string.format("%s%s%s%s%s", 
+      indent, 
+      display_name and (display_name .. " ") or "",
+      value,
+      string.rep(" ", math.max(1, padding)),
+      offset_str
+    )
+    self:advance_offset()
+    
+  elseif value:match("^%d+$") then
+    -- Number
+    local display_name = name and (name .. ":") or ""
+    lines[1] = string.format("%s%s %s", indent, display_name, value)
+    self:advance_offset()
+    
+  elseif value:match("^%[%[.+%]%]$") then
+    -- Array of arrays
+    lines[1] = indent .. (name and (name .. ":") or "Arrays:") .. string.rep(" ", 50 - #indent - #name - 7) .. offset_str
+    local inner = value:sub(2, -2)
+    local arrays = self:split_by_delimiter(inner, "]", false)
+    
+    for i, arr in ipairs(arrays) do
+      arr = arr:gsub("^%s*,%s*%[", "["):gsub("^%s*%[", "[")
+      if arr ~= "" then
+        local prefix = i < #arrays and tree_chars.mid or tree_chars.last
+        local sub_lines = self:parse_value(arr, indent .. prefix .. " ", string.format("[%d]", i-1))
+        for _, line in ipairs(sub_lines) do
+          table.insert(lines, line)
+        end
+      end
+    end
+    
+  elseif value:match("^%[.+%]$") then
+    -- Simple array
+    local inner = value:sub(2, -2)
+    local items = self:split_by_delimiter(inner, ",", true)
+    
+    if #items > 0 and items[1]:match("^0x") then
+      -- Array of addresses
+      lines[1] = indent .. (name and (name .. ":") or "addresses:") .. string.rep(" ", 50 - #indent - #(name or "addresses") - 1) .. offset_str
+      for i, item in ipairs(items) do
+        local prefix = i < #items and tree_chars.mid or tree_chars.last
+        local sub_indent = indent .. tree_chars.vert .. " "
+        if i == #items then
+          sub_indent = indent .. tree_chars.empty .. " "
+        end
+        table.insert(lines, string.format("%s%s [%d] %s", indent, prefix, i-1, item))
+        self:advance_offset()
+      end
+    else
+      -- Array of numbers or other values
+      lines[1] = indent .. (name and (name .. ":") or "values:") .. string.rep(" ", 50 - #indent - #(name or "values") - 1) .. offset_str
+      for i, item in ipairs(items) do
+        local prefix = i < #items and tree_chars.mid or tree_chars.last
+        table.insert(lines, string.format("%s%s [%d] %s", indent, prefix, i-1, item))
+        self:advance_offset()
+      end
+    end
+    
+  elseif value:match("^%((.+)%)$") then
+    -- Tuple
+    local inner = value:match("^%((.+)%)$")
+    local parts = self:split_by_delimiter(inner, ",", true)
+    
+    -- Special handling for common tuple patterns
+    if #parts == 2 and parts[1]:match("^0x") and parts[2]:match("^%d+$") then
+      -- (address, uint) pattern - likely operatorSet
+      lines[1] = indent .. "operatorSet:" .. string.rep(" ", 50 - #indent - 12) .. offset_str
+      table.insert(lines, indent .. tree_chars.mid .. " avs: " .. parts[1])
+      table.insert(lines, indent .. tree_chars.last .. " id:  " .. parts[2])
+      self:advance_offset(2)
+    else
+      -- Generic tuple
+      lines[1] = indent .. (name and (name .. ":") or "tuple:")
+      for i, part in ipairs(parts) do
+        local prefix = i < #parts and tree_chars.mid or tree_chars.last
+        local sub_lines = self:parse_value(part, indent .. prefix .. " ")
+        for _, line in ipairs(sub_lines) do
+          table.insert(lines, line)
+        end
+      end
+    end
+    
+  elseif value:match("^%[%((.+)%)%]$") then
+    -- Array of tuples (like AllocationParams)
+    lines[1] = indent .. (name and (name .. ":") or "AllocationParams:") .. string.rep(" ", 50 - #indent - #(name or "AllocationParams") - 1) .. offset_str
+    
+    -- Parse array of complex tuples
+    local inner = value:sub(2, -2)
+    local tuples = {}
+    local current = ""
+    local depth = 0
+    
+    for i = 1, #inner do
+      local char = inner:sub(i, i)
+      if char == "(" then
+        depth = depth + 1
+      elseif char == ")" then
+        depth = depth - 1
+        current = current .. char
+        if depth == 0 then
+          table.insert(tuples, current)
+          current = ""
+          -- Skip comma and space
+          if i < #inner and inner:sub(i+1, i+2) == ", " then
+            i = i + 2
+          end
+        end
+        goto continue
+      end
+      current = current .. char
+      ::continue::
+    end
+    
+    -- Parse each AllocationParam
+    for i, tuple in ipairs(tuples) do
+      if tuple:match("^%(%(.*%), %[.*%], %[.*%]%)$") then
+        -- This looks like ((address,uint32), address[], uint64[])
+        local parts = {}
+        local inner_tuple = tuple:match("^%((.+)%)$")
+        
+        -- Extract the three main parts
+        local operatorSet = inner_tuple:match("^(%(.-%))") 
+        local remaining = inner_tuple:sub(#operatorSet + 3) -- Skip ", "
+        local addresses_end = remaining:find("%], ")
+        local strategies = remaining:sub(2, addresses_end - 1) -- Skip "["
+        local magnitudes = remaining:match("%[([^%]]+)%]$")
+        
+        local item_indent = indent .. tree_chars.vert .. " "
+        if i == #tuples then
+          item_indent = indent .. tree_chars.empty .. " "
+        end
+        
+        local prefix = i < #tuples and tree_chars.mid or tree_chars.last
+        table.insert(lines, string.format("%sAllocationParams[%d]:", indent .. prefix .. " ", i-1))
+        
+        -- Parse operatorSet
+        local op_parts = operatorSet:match("%((.+)%)")
+        if op_parts then
+          local op_values = self:split_by_delimiter(op_parts, ",", true)
+          table.insert(lines, item_indent .. tree_chars.mid .. " operatorSet.avs: " .. (op_values[1] or ""))
+          table.insert(lines, item_indent .. tree_chars.mid .. " operatorSet.id:  " .. (op_values[2] or ""))
+        end
+        
+        -- Parse strategies
+        if strategies then
+          local strat_list = self:split_by_delimiter(strategies, ",", false)
+          table.insert(lines, item_indent .. tree_chars.mid .. " strategies:")
+          for j, strat in ipairs(strat_list) do
+            local strat_prefix = j < #strat_list and tree_chars.mid or tree_chars.last
+            table.insert(lines, item_indent .. tree_chars.vert .. " " .. strat_prefix .. string.format(" [%d] %s", j-1, strat))
+          end
+        end
+        
+        -- Parse magnitudes
+        if magnitudes then
+          local mag_list = self:split_by_delimiter(magnitudes, ",", false)
+          table.insert(lines, item_indent .. tree_chars.last .. " magnitudes:")
+          for j, mag in ipairs(mag_list) do
+            local mag_prefix = j < #mag_list and tree_chars.mid or tree_chars.last
+            table.insert(lines, item_indent .. tree_chars.empty .. " " .. mag_prefix .. string.format(" [%d] %s", j-1, mag))
+          end
+        end
+      else
+        -- Generic tuple in array
+        local prefix = i < #tuples and tree_chars.mid or tree_chars.last
+        local sub_lines = self:parse_value(tuple, indent .. prefix .. " ", string.format("[%d]", i-1))
+        for _, line in ipairs(sub_lines) do
+          table.insert(lines, line)
+        end
+      end
+    end
+    
+  else
+    -- Unknown format, display as-is
+    lines[1] = indent .. (name and (name .. ": ") or "") .. value
+  end
+  
+  return lines
+end
+
+-- Main formatting function
+local function format_decoded_output(lines, input_calldata)
+  local result = {}
+  local parser = ComplexParser:new()
+  
+  -- Extract function signature and parameter names
+  local function_sig = lines[1] or ""
+  parser:extract_param_names(function_sig)
+  
+  table.insert(result, "Function: " .. function_sig)
+  table.insert(result, "")
+  table.insert(result, "Calldata: 0x" .. input_calldata:sub(1, 10) .. "...")
+  table.insert(result, "")
+  
+  -- Parse arguments
+  for i = 2, #lines do
+    local line = lines[i]
+    if line and line ~= "" then
+      line = line:gsub("^%s+", ""):gsub("%s+$", "")
+      
+      -- Determine parameter name
+      local param_name = parser.parameter_names[i-1]
+      if param_name then
+        param_name = param_name:sub(1, 1):upper() .. param_name:sub(2) .. ":"
+      end
+      
+      -- Parse the value
+      local parsed_lines = parser:parse_value(line, "", param_name)
+      for _, parsed_line in ipairs(parsed_lines) do
+        table.insert(result, parsed_line)
+      end
+      
+      -- Add spacing between major parameters
+      if i < #lines then
+        table.insert(result, "")
+      end
+    end
+  end
+  
+  return result
+end
+
 -- ABI decode using Foundry's cast command
 M.abi_decode = function(input_calldata, config)
   -- Validate hex input
   input_calldata = validate_hex(input_calldata)
   
+  -- Store original for display
+  local display_calldata = input_calldata
+  
   -- Ensure calldata starts with 0x
   if not input_calldata:match("^0x") then
     input_calldata = "0x" .. input_calldata
+  else
+    display_calldata = input_calldata:sub(3) -- Remove 0x for display
   end
   
   -- Check if cast is available
@@ -251,28 +563,13 @@ M.abi_decode = function(input_calldata, config)
     error("No output from cast 4byte-decode")
   end
   
-  -- Format the output
-  local result = {
-    "ABI Decoded Calldata:",
-    string.rep("-", 50),
-  }
+  -- Format with tree structure
+  local result = format_decoded_output(lines, display_calldata)
   
-  -- First line should be the function signature
-  if lines[1] then
-    table.insert(result, "Function: " .. lines[1])
-    table.insert(result, "")
-    table.insert(result, "Arguments:")
-  end
-  
-  -- Remaining lines are the decoded arguments
-  for i = 2, #lines do
-    if lines[i] and lines[i] ~= "" then
-      table.insert(result, "  " .. lines[i])
-    end
-  end
-  
-  -- Add separator
-  table.insert(result, string.rep("-", 50))
+  -- Add header and footer
+  table.insert(result, 1, "ABI Decoded Calldata")
+  table.insert(result, 2, string.rep("─", 70))
+  table.insert(result, string.rep("─", 70))
   
   -- Output based on method
   if config.output_method == "insert" then

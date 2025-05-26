@@ -60,12 +60,18 @@ Default setup: >lua
                                                                  *:HexerDecode*
 :HexerDecode [input]
     Decode ABI calldata using Foundry's cast 4byte-decode command. Shows the
-    function signature and decoded arguments. Requires Foundry to be installed.
+    function signature and decoded arguments with a tree-structured view for
+    complex nested data. Automatically detects common patterns like operator
+    sets, strategies, and allocation parameters. Requires Foundry to be installed.
 
 DEFAULT KEYMAPS                                              *hexer-keymaps*
 
-The plugin provides the following default keymap:
-    <leader>ha    Decode ABI calldata (normal and visual mode)
+The plugin provides the following default keymaps:
+    <leader>hd    [H]exer [D]ecode - ABI decode calldata
+    <leader>hf    [H]exer [F]ormat - Format hex calldata  
+    <leader>ha    [H]exer [A]scii - Convert hex to ASCII
+
+All keymaps work in both normal and visual mode.
 
 To disable default keymaps, set before loading the plugin: >vim
     let g:hexer_no_mappings = 1

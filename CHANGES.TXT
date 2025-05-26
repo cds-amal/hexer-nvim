@@ -1,0 +1,74 @@
+CHANGES.TXT - hexer-nvim Plugin Changelog
+=========================================
+
+## [Unreleased] - 2025-01-26
+
+### Added
+- **Plugin Infrastructure**
+  - Added `plugin/hexer.vim` for proper command registration
+  - Created `:HexerFormat`, `:HexerBytesToAscii`, and `:HexerDecode` commands
+  - Added default keymaps with consistent mnemonics (can be disabled with `g:hexer_no_mappings`):
+    - `<leader>hd` - [H]exer [D]ecode (ABI decode)
+    - `<leader>hf` - [H]exer [F]ormat (format calldata)
+    - `<leader>ha` - [H]exer [A]scii (convert to ASCII)
+  - Implemented health check system (`:checkhealth hexer`)
+  - Added comprehensive documentation (`:help hexer`)
+
+- **Configuration System**
+  - Created `config.lua` module with extensive customization options
+  - Added `setup()` function for plugin initialization
+  - Configurable display options: group_size, chunk_size, show_offset, offset_format
+  - Configurable formatting: show_selector, uppercase hex
+  - Highlight group configuration for syntax highlighting
+
+- **ABI Decode Feature** (NEW!)
+  - Added `:HexerDecode` command using Foundry's `cast 4byte-decode`
+  - Complex nested structure parser with tree visualization
+  - Intelligent detection of common Solidity patterns (operatorSet, strategies, magnitudes)
+  - Automatic parameter name extraction from function signatures
+  - Offset tracking for each decoded element
+  - Support for arrays of tuples and nested data structures
+
+- **Visual Mode Support**
+  - All commands now work with visual selection
+  - Can select hex data and run commands on selection
+
+### Changed
+- **API Improvements**
+  - Functions now accept optional parameters instead of only using cursor word
+  - Added proper input validation for hex strings
+  - Flexible API that works with buffers, ranges, and parameters
+
+- **Error Handling**
+  - Comprehensive error handling with pcall protection
+  - Informative error messages via `vim.notify()`
+  - Validation of hex input (even length, valid characters)
+  - Graceful handling of missing dependencies (Foundry)
+
+- **User Interface**
+  - Replaced `print()` with `vim.notify()` for better Neovim integration
+  - Added namespace for highlights and extmarks
+  - Improved ASCII conversion with hex dump format
+  - Tree-structured output for decoded calldata
+
+### Fixed
+- **Code Quality**
+  - Removed commented-out code
+  - Fixed magic numbers by using named constants
+  - Added undo grouping for multi-line edits
+  - Fixed deprecated API usage (`vim.fn.expand` patterns)
+
+- **Keymap Conflicts**
+  - Resolved conflict where `<leader>ha` was suggested for both ASCII conversion and ABI decode
+  - Implemented consistent mnemonic scheme: [H]exer [D]ecode, [H]exer [F]ormat, [H]exer [A]scii
+  - All default keymaps now properly documented and conflict-free
+
+### Technical Improvements
+- Modular code organization with separation of concerns
+- Idiomatic Neovim plugin patterns
+- Forward compatibility with planned features (floating windows, virtual text)
+- Efficient string operations and table manipulation
+
+### Dependencies
+- Neovim >= 0.8.0 (required)
+- Foundry (optional, required for `:HexerDecode` command)

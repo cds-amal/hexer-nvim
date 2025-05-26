@@ -9,12 +9,17 @@ command! -nargs=? -range HexerFormat lua require('hexer').format_calldata(<f-arg
 command! -nargs=? -range HexerBytesToAscii lua require('hexer').bytes_to_ascii(<f-args>)
 command! -nargs=? -range HexerDecode lua require('hexer').abi_decode(<f-args>)
 
-" Deprecated commands for backward compatibility
-command! -nargs=0 HexerFormatCalldata lua require('hexer').format_calldata()
-command! -nargs=0 HexerConvertBytesToAscii lua require('hexer').bytes_to_ascii()
-
 " Default keymaps (can be disabled by setting g:hexer_no_mappings = 1)
 if !exists('g:hexer_no_mappings')
-  nnoremap <leader>ha <cmd>HexerDecode<cr>
-  vnoremap <leader>ha <cmd>HexerDecode<cr>
+  " [H]exer [D]ecode - ABI decode calldata
+  nnoremap <leader>hd <cmd>HexerDecode<cr>
+  vnoremap <leader>hd <cmd>HexerDecode<cr>
+  
+  " [H]exer [F]ormat - Format calldata  
+  nnoremap <leader>hf <cmd>HexerFormat<cr>
+  vnoremap <leader>hf <cmd>HexerFormat<cr>
+  
+  " [H]exer [A]scii - Convert to ASCII
+  nnoremap <leader>ha <cmd>HexerBytesToAscii<cr>
+  vnoremap <leader>ha <cmd>HexerBytesToAscii<cr>
 endif

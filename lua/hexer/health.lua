@@ -87,18 +87,11 @@ function M.check()
   if vim.g.hexer_no_mappings then
     vim.health.info("Default keymaps are disabled (g:hexer_no_mappings is set)")
   else
-    vim.health.ok("Default keymap <leader>ha is enabled for ABI decode")
+    vim.health.ok("Default keymaps enabled:")
+    vim.health.info("  <leader>hd - [H]exer [D]ecode (ABI decode)")
+    vim.health.info("  <leader>hf - [H]exer [F]ormat (format calldata)")
+    vim.health.info("  <leader>ha - [H]exer [A]scii (convert to ASCII)")
   end
-  
-  vim.health.info([[
-Suggested additional keymaps:
-```lua
-vim.keymap.set('n', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
-vim.keymap.set('v', '<leader>hf', '<cmd>HexerFormat<cr>', { desc = 'Format hex calldata' })
-vim.keymap.set('n', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
-vim.keymap.set('v', '<leader>hc', '<cmd>HexerBytesToAscii<cr>', { desc = 'Convert hex to ASCII' })
-```
-  ]])
 end
 
 return M
