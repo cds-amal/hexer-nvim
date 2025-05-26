@@ -32,6 +32,8 @@ With Foundry installed, you can decode calldata to see the function signature an
 0x952899ee0000000000000000000000007abf46564cfd4d67e36dc8fb5def6a1162ebaf6b...
 ```
 
+The decode function parses Solidity function signatures (the canonical form used for selector generation) and intelligently formats the decoded data.
+
 Running `:HexerDecode` will show:
 ```
 ABI Decoded Calldata

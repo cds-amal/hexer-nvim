@@ -252,13 +252,25 @@ end
 
 -- Extract parameter names from function signature
 function ComplexParser:extract_param_names(function_sig)
-  -- Extract the parameter list from the function signature
+  -- Use Solidity signature parser
+  local ok, sol_parser = pcall(require, "hexer.solidity_parser")
+  if ok then
+    local func_info = sol_parser.parse_signature(function_sig)
+    if func_info then
+      self.function_info = func_info
+      self.parameter_names = sol_parser.generate_parameter_names(func_info.parameters)
+      return
+    end
+  end
+  
+  -- Fallback to simple regex-based parsing
   local params = function_sig:match("%((.+)%)$")
   if not params then return end
   
-  -- Simple extraction of parameter names for common patterns
-  if params:match("address%s*,%s*%(%(.+%)%[%]%)%[%]") then
-    -- Pattern like: address, ((address,uint32), address[], uint64[])[]
+  local func_name = function_sig:match("^(%w+)")
+  
+  -- Simple extraction for common patterns
+  if func_name == "modifyAllocations" and params:match("address%s*,%s*%(%(.+%)%[%]%)%[%]") then
     self.parameter_names = {"operator", "allocationParams"}
   elseif params:match("address%s*,%s*address") then
     self.parameter_names = {"from", "to"}
@@ -388,9 +400,15 @@ function ComplexParser:parse_value(value, indent, name)
       end
     end
     
-  elseif value:match("^%[%((.+)%)%]$") then
+  elseif value:match("^%[%(") then
     -- Array of tuples (like AllocationParams)
-    lines[1] = indent .. (name and (name .. ":") or "AllocationParams:") .. string.rep(" ", 50 - #indent - #(name or "AllocationParams") - 1) .. offset_str
+    -- Determine the name based on context
+    local array_name = name or "AllocationParams"
+    -- For modifyAllocations, the second parameter is typically allocationParams
+    if name == "AllocationParams:" then
+      array_name = "AllocationParams"
+    end
+    lines[1] = indent .. array_name .. ":" .. string.rep(" ", 50 - #indent - #array_name - 1) .. offset_str
     
     -- Parse array of complex tuples
     local inner = value:sub(2, -2)
@@ -402,36 +420,69 @@ function ComplexParser:parse_value(value, indent, name)
       local char = inner:sub(i, i)
       if char == "(" then
         depth = depth + 1
+        current = current .. char
       elseif char == ")" then
         depth = depth - 1
         current = current .. char
-        if depth == 0 then
+        if depth == 0 and i < #inner and inner:sub(i+1, i+1) == "," then
           table.insert(tuples, current)
           current = ""
-          -- Skip comma and space
-          if i < #inner and inner:sub(i+1, i+2) == ", " then
-            i = i + 2
+          i = i + 1  -- Skip comma
+          -- Skip optional space
+          if i < #inner and inner:sub(i+1, i+1) == " " then
+            i = i + 1
           end
         end
-        goto continue
+      elseif char ~= "" then
+        current = current .. char
       end
-      current = current .. char
-      ::continue::
+    end
+    
+    -- Add last tuple if exists
+    if current ~= "" then
+      table.insert(tuples, current)
     end
     
     -- Parse each AllocationParam
     for i, tuple in ipairs(tuples) do
       if tuple:match("^%(%(.*%), %[.*%], %[.*%]%)$") then
         -- This looks like ((address,uint32), address[], uint64[])
-        local parts = {}
         local inner_tuple = tuple:match("^%((.+)%)$")
         
-        -- Extract the three main parts
-        local operatorSet = inner_tuple:match("^(%(.-%))") 
-        local remaining = inner_tuple:sub(#operatorSet + 3) -- Skip ", "
-        local addresses_end = remaining:find("%], ")
-        local strategies = remaining:sub(2, addresses_end - 1) -- Skip "["
-        local magnitudes = remaining:match("%[([^%]]+)%]$")
+        -- Extract the three main parts more carefully
+        local parts = {}
+        local part = ""
+        local depth = 0
+        local in_bracket = false
+        
+        for j = 1, #inner_tuple do
+          local char = inner_tuple:sub(j, j)
+          if char == "(" then
+            depth = depth + 1
+          elseif char == ")" then
+            depth = depth - 1
+          elseif char == "[" then
+            in_bracket = true
+          elseif char == "]" then
+            in_bracket = false
+          end
+          
+          if char == "," and depth == 0 and not in_bracket then
+            table.insert(parts, trim(part))
+            part = ""
+            -- Skip space after comma
+            if j < #inner_tuple and inner_tuple:sub(j+1, j+1) == " " then
+              j = j + 1
+            end
+          else
+            part = part .. char
+          end
+        end
+        
+        -- Add last part
+        if part ~= "" then
+          table.insert(parts, trim(part))
+        end
         
         local item_indent = indent .. tree_chars.vert .. " "
         if i == #tuples then
@@ -439,33 +490,42 @@ function ComplexParser:parse_value(value, indent, name)
         end
         
         local prefix = i < #tuples and tree_chars.mid or tree_chars.last
-        table.insert(lines, string.format("%sAllocationParams[%d]:", indent .. prefix .. " ", i-1))
+        table.insert(lines, string.format("%s%sAllocationParams[%d]:", indent, prefix, i-1))
         
-        -- Parse operatorSet
-        local op_parts = operatorSet:match("%((.+)%)")
-        if op_parts then
-          local op_values = self:split_by_delimiter(op_parts, ",", true)
-          table.insert(lines, item_indent .. tree_chars.mid .. " operatorSet.avs: " .. (op_values[1] or ""))
-          table.insert(lines, item_indent .. tree_chars.mid .. " operatorSet.id:  " .. (op_values[2] or ""))
-        end
-        
-        -- Parse strategies
-        if strategies then
-          local strat_list = self:split_by_delimiter(strategies, ",", false)
-          table.insert(lines, item_indent .. tree_chars.mid .. " strategies:")
-          for j, strat in ipairs(strat_list) do
-            local strat_prefix = j < #strat_list and tree_chars.mid or tree_chars.last
-            table.insert(lines, item_indent .. tree_chars.vert .. " " .. strat_prefix .. string.format(" [%d] %s", j-1, strat))
+        -- Parse operatorSet (first part)
+        if parts[1] and parts[1]:match("^%(.*%)$") then
+          local op_parts = parts[1]:match("%((.+)%)")
+          if op_parts then
+            local op_values = self:split_by_delimiter(op_parts, ",", true)
+            table.insert(lines, item_indent .. tree_chars.mid .. " operatorSet:")
+            table.insert(lines, item_indent .. tree_chars.vert .. " " .. tree_chars.mid .. " avs: " .. trim(op_values[1] or ""))
+            table.insert(lines, item_indent .. tree_chars.vert .. " " .. tree_chars.last .. " id:  " .. trim(op_values[2] or ""))
           end
         end
         
-        -- Parse magnitudes
-        if magnitudes then
-          local mag_list = self:split_by_delimiter(magnitudes, ",", false)
-          table.insert(lines, item_indent .. tree_chars.last .. " magnitudes:")
-          for j, mag in ipairs(mag_list) do
-            local mag_prefix = j < #mag_list and tree_chars.mid or tree_chars.last
-            table.insert(lines, item_indent .. tree_chars.empty .. " " .. mag_prefix .. string.format(" [%d] %s", j-1, mag))
+        -- Parse strategies (second part)
+        if parts[2] and parts[2]:match("^%[.*%]$") then
+          local strategies = parts[2]:match("%[(.*)%]")
+          if strategies then
+            local strat_list = self:split_by_delimiter(strategies, ",", false)
+            table.insert(lines, item_indent .. tree_chars.mid .. " strategies:")
+            for j, strat in ipairs(strat_list) do
+              local strat_prefix = j < #strat_list and tree_chars.mid or tree_chars.last
+              table.insert(lines, item_indent .. tree_chars.vert .. " " .. strat_prefix .. string.format(" [%d] %s", j-1, trim(strat)))
+            end
+          end
+        end
+        
+        -- Parse magnitudes (third part)
+        if parts[3] and parts[3]:match("^%[.*%]$") then
+          local magnitudes = parts[3]:match("%[(.*)%]")
+          if magnitudes then
+            local mag_list = self:split_by_delimiter(magnitudes, ",", false)
+            table.insert(lines, item_indent .. tree_chars.last .. " magnitudes:")
+            for j, mag in ipairs(mag_list) do
+              local mag_prefix = j < #mag_list and tree_chars.mid or tree_chars.last
+              table.insert(lines, item_indent .. tree_chars.empty .. " " .. mag_prefix .. string.format(" [%d] %s", j-1, trim(mag)))
+            end
           end
         end
       else
@@ -491,8 +551,10 @@ local function format_decoded_output(lines, input_calldata)
   local result = {}
   local parser = ComplexParser:new()
   
-  -- Extract function signature and parameter names
+  -- Extract function signature and parameter names  
   local function_sig = lines[1] or ""
+  -- Remove the "1)" prefix if present (cast sometimes numbers multiple matches)
+  function_sig = function_sig:gsub('^%d+%)%s*"?', ""):gsub('"$', "")
   parser:extract_param_names(function_sig)
   
   table.insert(result, "Function: " .. function_sig)
@@ -507,8 +569,9 @@ local function format_decoded_output(lines, input_calldata)
       line = line:gsub("^%s+", ""):gsub("%s+$", "")
       
       -- Determine parameter name
-      local param_name = parser.parameter_names[i-1]
-      if param_name then
+      local param_name = nil
+      if parser.parameter_names and parser.parameter_names[i-1] then
+        param_name = parser.parameter_names[i-1]
         param_name = param_name:sub(1, 1):upper() .. param_name:sub(2) .. ":"
       end
       
